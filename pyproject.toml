@@ -1,0 +1,81 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "api-attack-path-analyzer"
+version = "0.1.0"
+description = "AI-powered API attack path analysis combining Neo4j knowledge graphs with Claude LLM reasoning"
+readme = "README.md"
+license = { text = "Apache-2.0" }
+requires-python = ">=3.11"
+dependencies = [
+    "pydantic>=2.5.0",
+    "prance[cli]>=23.6.21.0",
+    "openapi-spec-validator>=0.7.1",
+    "neo4j>=5.15.0",
+    "anthropic>=0.34.0",
+    "jinja2>=3.1.2",
+    "typer>=0.9.0",
+    "fastapi>=0.104.0",
+    "uvicorn[standard]>=0.24.0",
+    "pyyaml>=6.0.1",
+    "diskcache>=5.6.3",
+    "sqlalchemy>=2.0.23",
+    "httpx>=0.25.2",
+    "rich>=13.7.0",
+    "python-dotenv>=1.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-cov>=4.1.0",
+    "pytest-asyncio>=0.23.0",
+    "mypy>=1.7.0",
+    "ruff>=0.1.0",
+    "types-PyYAML>=6.0.12",
+]
+
+[project.scripts]
+api-analyzer = "api_analyzer.cli:app"
+
+[tool.hatch.build.targets.wheel]
+packages = ["api_analyzer"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP", "B", "C4", "RUF"]
+ignore = ["E501"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+disallow_any_generics = true
+no_implicit_optional = true
+plugins = ["pydantic.mypy"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"
+pythonpath = ["."]
+
+[tool.coverage.run]
+source = ["api_analyzer"]
+omit = ["*/tests/*"]
+
+[tool.coverage.report]
+fail_under = 80
+show_missing = true

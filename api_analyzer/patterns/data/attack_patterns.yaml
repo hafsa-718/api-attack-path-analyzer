@@ -1,0 +1,194 @@
+# OWASP API Security attack patterns for the API Attack Path Analyzer.
+# Pattern IDs AP-001 through AP-007 correspond to M6 query functions in
+# api_analyzer/graph/queries.py.
+#
+# Field reference:
+#   id              — stable identifier used across all pipeline stages
+#   name            — human-readable pattern name for reports
+#   owasp_category  — "APIx:YYYY" reference (e.g. "API1:2023")
+#   owasp_description — short OWASP category title
+#   severity        — base severity: CRITICAL | HIGH | MEDIUM | LOW | INFO
+#   confidence_base — prior confidence before LLM validation (0.0–1.0)
+#   mitre_hints     — MITRE ATT&CK technique IDs suggested by this pattern
+#   description     — what vulnerability this pattern detects
+#   indicators      — graph signals that increase confidence in this pattern
+#   remediation     — ordered fix recommendations for the HTML report
+
+- id: AP-001
+  name: "BOLA / Broken Object Level Authorization"
+  owasp_category: "API1:2023"
+  owasp_description: "Broken Object Level Authorization"
+  severity: HIGH
+  confidence_base: 0.65
+  mitre_hints:
+    - "T1078"
+    - "T1530"
+  description: >
+    An endpoint accesses individual resource records via predictable identifiers
+    (integer IDs or UUIDs), allowing an attacker to substitute their own identifier
+    with another user's identifier to access unauthorized records.
+  indicators:
+    - "Path parameter type is INTEGER or UUID"
+    - "Resource has a READS endpoint (detail view)"
+    - "Optional LISTS endpoint enables ID enumeration"
+    - "Detail endpoint is PUBLIC or has SENSITIVE/CRITICAL sensitivity"
+    - "No ownership validation evident in spec"
+  remediation:
+    - "Implement object-level authorization checks on every resource access"
+    - "Use random, non-sequential GUIDs for resource identifiers"
+    - "Validate that the authenticated user owns or has explicit permission to access the requested resource"
+    - "Log and alert on access patterns that suggest ID enumeration"
+
+- id: AP-002
+  name: "Broken Authentication"
+  owasp_category: "API2:2023"
+  owasp_description: "Broken Authentication"
+  severity: CRITICAL
+  confidence_base: 0.75
+  mitre_hints:
+    - "T1078"
+    - "T1110"
+  description: >
+    A PUBLIC endpoint returns sensitive or critical data (SENSITIVE/CRITICAL
+    sensitivity class) without requiring authentication, or uses weak/missing
+    authentication mechanisms that can be bypassed.
+  indicators:
+    - "Endpoint is_public=True"
+    - "SensitivityClass is SENSITIVE or CRITICAL"
+    - "Endpoint returns PII fields"
+    - "No security scheme declared in spec"
+  remediation:
+    - "Apply authentication to all endpoints that return sensitive data"
+    - "Use strong, standard authentication mechanisms (OAuth 2.0, OpenID Connect)"
+    - "Declare security requirements explicitly in the OpenAPI specification"
+    - "Implement token expiry, rotation, and revocation"
+    - "Protect authentication endpoints with rate limiting and brute-force detection"
+
+- id: AP-003
+  name: "Privilege Escalation via Role Parameter Injection"
+  owasp_category: "API3:2023"
+  owasp_description: "Broken Object Property Level Authorization"
+  severity: HIGH
+  confidence_base: 0.60
+  mitre_hints:
+    - "T1548"
+    - "T1078.003"
+  description: >
+    An endpoint accepts role, permission, group, or scope parameters in its
+    request body, enabling an attacker to self-assign elevated privileges by
+    supplying administrator-level values they should not be able to set.
+  indicators:
+    - "has_role_param=True on endpoint"
+    - "Method is POST, PUT, or PATCH"
+    - "Endpoint is DATA_WRITE function"
+    - "No validation evidence for role/permission field values"
+  remediation:
+    - "Never allow users to set or modify their own role, permission, or scope fields"
+    - "Apply allowlist validation to all privilege-related fields server-side"
+    - "Use separate admin-only endpoints for privilege assignment"
+    - "Implement property-level authorization checks, not just object-level"
+
+- id: AP-004
+  name: "Mass Assignment"
+  owasp_category: "API3:2023"
+  owasp_description: "Broken Object Property Level Authorization"
+  severity: HIGH
+  confidence_base: 0.55
+  mitre_hints:
+    - "T1548"
+    - "T1078"
+  description: >
+    A write endpoint (POST/PUT/PATCH) connected to an inferred resource accepts
+    client-supplied properties without filtering, potentially allowing an attacker
+    to set internal fields (is_admin, account_balance, verified_status) that
+    should not be user-controlled.
+  indicators:
+    - "Endpoint connected via WRITES relationship to a Resource node"
+    - "Method is POST, PUT, or PATCH"
+    - "accepts_pii=True indicates broad field acceptance"
+    - "No explicit property allowlist evident in spec schema"
+  remediation:
+    - "Define explicit allowlists of client-settable properties in request schemas"
+    - "Never bind raw request bodies directly to internal data models"
+    - "Use separate DTOs for create/update operations that exclude sensitive fields"
+    - "Mark sensitive properties as readOnly in the OpenAPI specification"
+
+- id: AP-005
+  name: "Excessive Data Exposure"
+  owasp_category: "API3:2023"
+  owasp_description: "Broken Object Property Level Authorization"
+  severity: MEDIUM
+  confidence_base: 0.50
+  mitre_hints:
+    - "T1530"
+    - "T1213"
+  description: >
+    An endpoint returns response payloads containing PII or sensitive fields.
+    When combined with public access or weak authentication, this enables
+    large-scale data exfiltration. The issue is particularly severe when
+    collection endpoints return full objects rather than summary views.
+  indicators:
+    - "returns_pii=True on endpoint"
+    - "Endpoint is PUBLIC or has sensitivity_class mismatch"
+    - "DATA_READ function suggests collection or detail response"
+    - "Response schema contains email, password, ssn, or similar PII fields"
+  remediation:
+    - "Return only the minimum fields required by each use case"
+    - "Use response filtering to exclude sensitive fields based on caller role"
+    - "Define separate response schemas for different permission levels"
+    - "Conduct regular data minimization reviews of API responses"
+
+- id: AP-006
+  name: "SSRF / Server-Side Request Forgery"
+  owasp_category: "API7:2023"
+  owasp_description: "Server Side Request Forgery"
+  severity: HIGH
+  confidence_base: 0.70
+  mitre_hints:
+    - "T1090"
+    - "T1567"
+  description: >
+    An endpoint accepts a URL-valued parameter (webhook URL, callback URL,
+    avatar URL, import URL, etc.), enabling an attacker to cause the server
+    to make HTTP requests to arbitrary internal or external targets — potentially
+    reaching cloud metadata services, internal APIs, or other sensitive resources.
+  indicators:
+    - "accepts_url_param=True on endpoint"
+    - "Parameter names suggest URL input (url, callback, webhook, redirect)"
+    - "Endpoint is publicly accessible"
+    - "No URL allowlist or SSRF protection evident in spec"
+  remediation:
+    - "Validate and allowlist URL schemes (https:// only) and permitted hosts"
+    - "Block access to private IP ranges (RFC 1918) and cloud metadata endpoints"
+    - "Use a dedicated URL-fetching service with strict egress controls"
+    - "Implement request timeouts and size limits on outbound HTTP requests"
+    - "Log and alert on outbound HTTP requests made on behalf of user-supplied URLs"
+
+- id: AP-007
+  name: "Auth Chain: Credential Theft to Sensitive Data Access"
+  owasp_category: "API2:2023"
+  owasp_description: "Broken Authentication"
+  severity: CRITICAL
+  confidence_base: 0.70
+  mitre_hints:
+    - "T1110"
+    - "T1528"
+    - "T1530"
+  description: >
+    A multi-hop attack chain beginning at an AUTH-function endpoint (login,
+    token exchange, password reset) and terminating at a SENSITIVE or CRITICAL
+    endpoint protected by the same auth scheme. Exploiting the authentication
+    mechanism grants credentials that unlock the sensitive target endpoint.
+  indicators:
+    - "AUTH-function entry endpoint (login, /token, /auth)"
+    - "Target endpoint protected by REQUIRES_AUTH relationship to a shared scheme"
+    - "Target has sensitivity_class SENSITIVE or CRITICAL"
+    - "Auth entry endpoint is publicly accessible"
+    - "Same auth scheme name links both endpoints"
+  remediation:
+    - "Harden authentication endpoints with rate limiting and account lockout"
+    - "Implement multi-factor authentication for sensitive operations"
+    - "Use short-lived tokens with minimal scope to limit blast radius"
+    - "Monitor authentication endpoints for brute-force and credential stuffing"
+    - "Apply additional authorization checks (ownership, scope) at target endpoints"
+    - "Rotate credentials immediately upon suspected compromise"

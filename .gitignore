@@ -1,0 +1,61 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Environment — NEVER commit .env (contains real secrets)
+.env
+.env.local
+.env.*.local
+
+# Test and coverage artefacts
+.pytest_cache/
+.coverage
+htmlcov/
+coverage.xml
+
+# Type checker and linter caches
+.mypy_cache/
+.ruff_cache/
+
+# LLM response cache (can be large; regenerated on demand)
+.cache/
+
+# Generated reports (output artefacts, not source)
+reports/
+*.html
+!api_analyzer/models/templates/**/*.html
+
+# Neo4j local data (when running without Docker volumes)
+neo4j/data/
+neo4j/logs/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Claude Code internal settings (machine-specific, no secrets but not portable)
+.claude/
+
+# Uploaded spec files and generated output artefacts
+petstore.yaml
+petstore_report.html
+validation_guide.html
+*.sarif

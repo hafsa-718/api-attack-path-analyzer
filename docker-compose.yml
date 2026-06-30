@@ -1,0 +1,31 @@
+version: "3.9"
+
+# Starts Neo4j only. The application runs on the host via `api-analyzer` CLI.
+# Usage: docker compose up -d
+# Neo4j browser: http://localhost:7474  (user: neo4j, password from NEO4J_PASSWORD)
+# Bolt URI for application: bolt://localhost:7687
+
+services:
+  neo4j:
+    image: neo4j:5.15-community
+    ports:
+      - "7474:7474"   # HTTP browser UI
+      - "7687:7687"   # Bolt protocol (application connection)
+    environment:
+      NEO4J_AUTH: "neo4j/${NEO4J_PASSWORD:-attackpath}"
+      # Increase heap for graph traversal on large specs
+      NEO4J_server_memory_heap_initial__size: "512m"
+      NEO4J_server_memory_heap_max__size: "1g"
+    volumes:
+      - neo4j_data:/data
+      - neo4j_logs:/logs
+    healthcheck:
+      test: ["CMD", "cypher-shell", "-u", "neo4j", "-p", "${NEO4J_PASSWORD:-attackpath}", "RETURN 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+volumes:
+  neo4j_data:
+  neo4j_logs:
