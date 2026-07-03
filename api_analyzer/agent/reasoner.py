@@ -97,6 +97,9 @@ class ReasonerConfig:
 
 
 # ── System prompt (static — same for every chain) ─────────────────────────────
+# Passed as a content-block list so Anthropic can cache it after the first call.
+# Subsequent calls in the same analysis run pay ~10% of normal input-token cost
+# for these tokens.  Cache TTL is 5 minutes — well within a typical analysis run.
 
 _SYSTEM_PROMPT: str = """You are an expert API security researcher validating candidate attack chains \
 discovered by automated graph analysis of an OpenAPI specification.
@@ -137,6 +140,15 @@ Rate limiting language rules (apply to every finding):
   to HIGH/CRITICAL when combined with a confirmed auth bypass or sensitive data exposure.
 
 """ + "\n" + INJECTION_DEFENCE_PROMPT
+
+# Pre-built content-block form with cache_control — built once at import time.
+_CACHED_SYSTEM: list[dict[str, Any]] = [
+    {
+        "type": "text",
+        "text": _SYSTEM_PROMPT,
+        "cache_control": {"type": "ephemeral"},
+    }
+]
 
 
 # ── Tool schemas ───────────────────────────────────────────────────────────────
@@ -269,6 +281,14 @@ _TOOL_SCHEMAS: list[dict[str, Any]] = [
             ],
         },
     },
+]
+
+
+# Cache breakpoint on the last tool — Anthropic caches everything up to and
+# including the marked item, so this covers all four tool definitions.
+_CACHED_TOOLS: list[dict[str, Any]] = [
+    *_TOOL_SCHEMAS[:-1],
+    {**_TOOL_SCHEMAS[-1], "cache_control": {"type": "ephemeral"}},
 ]
 
 
@@ -463,8 +483,8 @@ def _analyze_chain(
         response = client.messages.create(
             model=config.llm_model,
             max_tokens=config.max_tokens,
-            system=_SYSTEM_PROMPT,
-            tools=_TOOL_SCHEMAS,  # type: ignore[arg-type]
+            system=_CACHED_SYSTEM,  # type: ignore[arg-type]
+            tools=_CACHED_TOOLS,    # type: ignore[arg-type]
             messages=messages,
         )
         total_tokens += response.usage.input_tokens + response.usage.output_tokens
