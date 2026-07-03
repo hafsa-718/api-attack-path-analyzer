@@ -13,12 +13,13 @@ Environment variables
 from __future__ import annotations
 
 import os
+import secrets
 from contextlib import asynccontextmanager
 from pathlib import Path
 
 from dotenv import load_dotenv
-from fastapi import FastAPI
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi import FastAPI, Request
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from neo4j import GraphDatabase
 
 from api_analyzer import __version__
@@ -56,6 +57,27 @@ app = FastAPI(
     version=__version__,
     lifespan=_lifespan,
 )
+
+# ── Optional API-key guard ─────────────────────────────────────────────────────
+# Set ANALYZER_API_KEY in .env (or the host environment) to require callers to
+# send   X-API-Key: <value>   on every request except GET /health and GET /.
+# When the variable is not set the server is open (development default).
+_ANALYZER_API_KEY: str | None = os.getenv("ANALYZER_API_KEY")
+
+_OPEN_PATHS: frozenset[str] = frozenset({"/", "/health"})
+
+
+@app.middleware("http")
+async def _api_key_middleware(request: Request, call_next):
+    if _ANALYZER_API_KEY and request.url.path not in _OPEN_PATHS:
+        provided = request.headers.get("X-API-Key", "")
+        if not secrets.compare_digest(provided, _ANALYZER_API_KEY):
+            return JSONResponse(
+                status_code=401,
+                content={"detail": "Missing or invalid X-API-Key header."},
+            )
+    return await call_next(request)
+
 
 app.include_router(router)
 

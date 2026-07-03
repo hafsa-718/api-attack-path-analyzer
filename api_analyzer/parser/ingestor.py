@@ -106,12 +106,20 @@ def ingest(path: Path | str) -> ParsedSpec:
         $refs cannot be resolved (circular or missing), or the spec has neither
         an "openapi" nor a "swagger" root key.
     """
+    from api_analyzer.security.injection_guard import sanitise_spec  # noqa: PLC0415
+
     path = Path(path)
     if not path.exists():
         raise SpecParseError(f"Spec file not found: {path}")
     raw = _load_raw(path)
     resolved = _resolve_refs(raw, path)
-    return parse_spec_dict(resolved)
+    sanitised, injection_warnings = sanitise_spec(resolved)
+    spec = parse_spec_dict(sanitised)
+    if injection_warnings:
+        spec = spec.model_copy(update={
+            "parse_warnings": list(spec.parse_warnings) + injection_warnings
+        })
+    return spec
 
 
 def parse_spec_dict(raw: dict[str, Any]) -> ParsedSpec:
