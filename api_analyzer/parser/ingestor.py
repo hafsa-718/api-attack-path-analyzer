@@ -107,6 +107,7 @@ def ingest(path: Path | str) -> ParsedSpec:
         an "openapi" nor a "swagger" root key.
     """
     from api_analyzer.security.injection_guard import sanitise_spec  # noqa: PLC0415
+    from api_analyzer.security.dlp_guard import redact_spec           # noqa: PLC0415
 
     path = Path(path)
     if not path.exists():
@@ -114,11 +115,11 @@ def ingest(path: Path | str) -> ParsedSpec:
     raw = _load_raw(path)
     resolved = _resolve_refs(raw, path)
     sanitised, injection_warnings = sanitise_spec(resolved)
-    spec = parse_spec_dict(sanitised)
-    if injection_warnings:
-        spec = spec.model_copy(update={
-            "parse_warnings": list(spec.parse_warnings) + injection_warnings
-        })
+    redacted, dlp_warnings = redact_spec(sanitised)
+    spec = parse_spec_dict(redacted)
+    all_warnings = list(spec.parse_warnings) + injection_warnings + dlp_warnings
+    if all_warnings:
+        spec = spec.model_copy(update={"parse_warnings": all_warnings})
     return spec
 
 
